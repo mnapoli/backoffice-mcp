@@ -2,6 +2,8 @@
 
 Let an AI agent read your Laravel application's database through a strict, read-only whitelist of Eloquent models.
 
+<p align="center"><img src="art/claude-conversation.png" width="840" alt="A support question answered by Claude through a read-only back-office MCP server"></p>
+
 It is meant for internal tools: an admin server for you, a support server for your support team… Each server exposes three tools: `schema`, `query` and `count`. It is built on [`laravel/mcp`](https://github.com/laravel/mcp) and [`spatie/laravel-query-builder`](https://github.com/spatie/laravel-query-builder).
 
 Anything absent from the whitelist is unreachable. A column that is not listed is never selected nor returned, and a filter, sort, relation or resource that is not listed is rejected rather than silently ignored.

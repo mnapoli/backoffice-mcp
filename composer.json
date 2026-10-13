@@ -1,6 +1,6 @@
 {
     "name": "mnapoli/backoffice-mcp",
-    "description": "A read-only MCP server over a whitelist of Eloquent models, for the internal tools of a Laravel application",
+    "description": "Give AI agents access to your app's models for admin and support tasks",
     "keywords": ["laravel", "mcp", "eloquent", "admin"],
     "license": "MIT",
     "require": {

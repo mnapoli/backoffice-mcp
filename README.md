@@ -64,7 +64,13 @@ Soft-deleted rows are excluded unless the agent asks for them with `trashed`.
 
 The model's own `$hidden`, `$visible` and `$appends` are ignored: the whitelist alone decides what a row contains.
 
-Describe your domain to the agent by overriding `$instructions`, for example to point at where the models and migrations live.
+Tell the agent what the server is for with `$description`, for example which application this is and which repository holds its code:
+
+```php
+protected string $description = 'The Acme database, for its support team. The application is the acme/app repository.';
+```
+
+It comes before the generic instructions on using the tools, which also tell the agent to explore the application's code to understand the data. Override `$instructions` to replace those entirely.
 
 ## Exposing it
 

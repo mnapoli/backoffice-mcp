@@ -13,6 +13,8 @@ class SupportServer extends McpServer
 {
     protected string $name = 'Support';
 
+    protected string $description = 'The customers of Acme, for its support team.';
+
     public int $maxLimit = 10;
 
     protected function resources(): array

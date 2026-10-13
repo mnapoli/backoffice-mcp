@@ -109,6 +109,23 @@ class RouteTest extends TestCase
         }
     }
 
+    public function test_the_description_comes_before_the_generic_instructions(): void
+    {
+        $instructions = fn(string $path, string $token) => $this->postJson($path, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'initialize',
+            'params' => ['protocolVersion' => '2025-06-18', 'capabilities' => [], 'clientInfo' => ['name' => 'test', 'version' => '1']],
+        ], $this->bearer($token))->assertOk()->json('result.instructions');
+
+        $support = $instructions('/mcp/support', self::SUPPORT_TOKEN);
+        $this->assertStringStartsWith("The customers of Acme, for its support team.\n\nRead-only access", $support);
+        $this->assertStringContainsString('Start with the `schema` tool', $support);
+
+        // Without a description, the generic instructions alone
+        $this->assertStringStartsWith('Read-only access', $instructions('/mcp/admin', self::ADMIN_TOKEN));
+    }
+
     public function test_the_server_exposes_three_read_only_tools(): void
     {
         $response = $this->postJson('/mcp/admin', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list'], $this->bearer(self::ADMIN_TOKEN))

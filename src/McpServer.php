@@ -30,9 +30,18 @@ abstract class McpServer extends Server
         it lists is accepted: everything else is rejected rather than silently dropped. Some tables
         and columns are excluded on purpose, so their absence is not a bug.
 
+        What the resources, columns and statuses mean is not described here. If you have access to
+        the application's source code, explore it to find out, starting in `app/`.
+
         There is no `GROUP BY`. Aggregate with the `count` tool, or with the `counts` argument of
         `query` for a per-row relation count.
         MARKDOWN;
+
+    /**
+     * What this server is for and what its data is about, given to the agent before the generic
+     * `$instructions` on how to use the tools.
+     */
+    protected string $description = '';
 
     /** Rows a query returns when the caller does not say. */
     public int $defaultLimit = 25;
@@ -72,6 +81,10 @@ abstract class McpServer extends Server
     public function __construct(Transport $transport)
     {
         parent::__construct($transport);
+
+        if (trim($this->description) !== '') {
+            $this->instructions = trim($this->description) . "\n\n" . trim($this->instructions);
+        }
 
         $this->tools = [
             ...$this->tools,

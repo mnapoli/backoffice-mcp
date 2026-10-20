@@ -138,6 +138,16 @@ class OAuthTest extends TestCase
         $this->postJson('/mcp/admin', $this->ping(), $this->bearer($token))->assertOk();
     }
 
+    public function test_client_registration_is_throttled(): void
+    {
+        $register = fn() => $this->postJson('/oauth/register', ['client_name' => 'Claude', 'redirect_uris' => [self::REDIRECT_URI]]);
+        foreach (range(1, 30) as $ignored) {
+            $register()->assertCreated();
+        }
+
+        $register()->assertTooManyRequests();
+    }
+
     public function test_a_server_with_oauth_turned_off_has_no_route(): void
     {
         $token = $this->connect($this->member('admin@example.com'));

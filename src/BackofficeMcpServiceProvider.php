@@ -35,9 +35,12 @@ final class BackofficeMcpServiceProvider extends ServiceProvider
         }
 
         // The discovery and client registration endpoints that MCP clients look for, shared by
-        // every server behind OAuth
+        // every server behind OAuth. Registering a client needs no authentication and adds a row to
+        // the database: the throttle keeps anyone from filling the table.
         if ($oauth) {
-            Mcp::oauthRoutes();
+            Route::middleware('throttle:30,1,backoffice-mcp:oauth')->group(function () {
+                Mcp::oauthRoutes();
+            });
         }
     }
 

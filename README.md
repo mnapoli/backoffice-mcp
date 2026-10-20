@@ -80,7 +80,9 @@ Publish the configuration file:
 php artisan vendor:publish --tag=backoffice-mcp-config
 ```
 
-Then declare your servers in `config/backoffice-mcp.php`:
+Then declare your servers in `config/backoffice-mcp.php`. Each one is behind a bearer token, or behind a login with the user accounts of your application.
+
+### Behind a token
 
 ```php
 return [
@@ -90,13 +92,6 @@ return [
             'path' => 'mcp/admin',
             'auth' => [
                 'token' => env('ADMIN_MCP_TOKEN'),
-            ],
-        ],
-        'support' => [
-            'server' => App\Mcp\SupportMcpServer::class,
-            'path' => 'mcp/support',
-            'auth' => [
-                'token' => env('SUPPORT_MCP_TOKEN'),
             ],
         ],
     ],
@@ -112,7 +107,72 @@ claude mcp add acme-admin --transport http https://example.com/mcp/admin \
     --header "Authorization: Bearer $TOKEN"
 ```
 
-Requests are throttled to 60 per minute per client (`requests_per_minute` to change it). Every tool call is logged with `Log::info()`.
+### Behind a login (OAuth)
+
+Claude (web, desktop and mobile), ChatGPT and most MCP clients connect with OAuth: you add the URL of the server, log in to your application in the browser, and approve the client. Only the users who pass the gate of the server can connect.
+
+```php
+'support' => [
+    'server' => App\Mcp\SupportMcpServer::class,
+    'path' => 'mcp/support',
+    'auth' => [
+        'oauth' => true,
+        'gate' => 'useSupportMcp',
+    ],
+],
+```
+
+Define the gate in a service provider, it receives the logged-in user:
+
+```php
+Gate::define('useSupportMcp', fn (User $user) => $user->is_support_agent);
+```
+
+The gate is checked on every request, so a user who loses the right loses access immediately, whatever tokens their clients hold. The gate is required: without one, every user of your application could read the server.
+
+OAuth runs on [Laravel Passport](https://laravel.com/docs/passport):
+
+1. Install it:
+
+    ```sh
+    composer require laravel/passport
+    php artisan passport:install
+    ```
+
+    Your user model needs neither Passport's `HasApiTokens` trait nor an `api` guard, so Passport can live alongside Sanctum. Users are those of the guard that Passport logs them in with, `web` unless you set `passport.guard`. In production, give Passport its keys with the `PASSPORT_PRIVATE_KEY` and `PASSPORT_PUBLIC_KEY` environment variables.
+
+2. Publish the consent screen, adapt it to your application's layout and styles, and tell Passport to use it in a service provider:
+
+    ```sh
+    php artisan vendor:publish --tag=mcp-views
+    ```
+
+    ```php
+    Passport::authorizationView(fn ($parameters) => view('mcp.authorize', $parameters));
+    ```
+
+    Passport's access tokens last a year by default. MCP clients refresh theirs, so a shorter lifetime costs nothing and limits what a leaked token is worth: `Passport::tokensExpireIn(now()->addHour())`.
+
+3. Any MCP client can register itself and ask your users for access, under any name. By default it can then send them back anywhere after the consent screen, with the code that gets it a token. Limit that to the clients you use, in `config/mcp.php` (`php artisan vendor:publish --tag=mcp-config`):
+
+    ```php
+    'redirect_domains' => [
+        'https://claude.ai',
+        'https://chatgpt.com',
+        'http://localhost', // Claude Code
+    ],
+    ```
+
+Users who are not logged in are sent to your `login` route, then back to the consent screen. To connect:
+
+- Claude: *Settings > Connectors > Add custom connector*, with the URL of the server.
+- Claude Code: `claude mcp add acme-support --transport http https://example.com/mcp/support`, then `/mcp` to log in.
+
+Turn OAuth off for an environment with `'oauth' => (bool) env('SUPPORT_MCP_OAUTH')`: the route is then not registered, as with an empty token.
+
+### Throttling and logging
+
+Requests are throttled to 60 per minute per server, and per IP address or, behind OAuth, per user (`requests_per_minute` to change it). Every tool call is logged with `Log::info()`, with the `user_id` behind OAuth.
 
 ## Limits
 

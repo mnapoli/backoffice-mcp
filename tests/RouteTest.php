@@ -95,6 +95,11 @@ class RouteTest extends TestCase
             'bad throttle' => ['server' => AdminServer::class, 'path' => 'mcp/x', 'requests_per_minute' => '60'],
             'auth not an array' => ['server' => AdminServer::class, 'path' => 'mcp/x', 'auth' => 'secret'],
             'unknown auth method' => ['server' => AdminServer::class, 'path' => 'mcp/x', 'auth' => ['tokne' => 'secret']],
+            'oauth without a gate' => ['server' => AdminServer::class, 'path' => 'mcp/x', 'auth' => ['oauth' => true]],
+            'oauth turned off, without a gate' => ['server' => AdminServer::class, 'path' => 'mcp/x', 'auth' => ['oauth' => false]],
+            'oauth not a boolean' => ['server' => AdminServer::class, 'path' => 'mcp/x', 'auth' => ['oauth' => 'yes', 'gate' => 'admin']],
+            'a gate with a token' => ['server' => AdminServer::class, 'path' => 'mcp/x', 'auth' => ['token' => 'secret', 'gate' => 'admin']],
+            'both a token and oauth' => ['server' => AdminServer::class, 'path' => 'mcp/x', 'auth' => ['token' => 'secret', 'oauth' => true, 'gate' => 'admin']],
         ];
 
         foreach ($misconfigurations as $case => $server) {

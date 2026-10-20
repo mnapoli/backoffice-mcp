@@ -4,6 +4,7 @@ namespace BackofficeMcp\Tools;
 
 use Closure;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Mcp\Request;
@@ -25,7 +26,10 @@ abstract class BackofficeTool extends Tool
 
     public function handle(Request $request): Response|ResponseFactory
     {
-        Log::info(sprintf('MCP call: %s %s', $this->server->name(), $this->name()), $request->all());
+        // Behind OAuth, who asked: the token alone names nobody. It comes first so that an argument
+        // named `user_id` cannot pass for it.
+        $user = Auth::id();
+        Log::info(sprintf('MCP call: %s %s', $this->server->name(), $this->name()), ($user !== null ? ['user_id' => $user] : []) + $request->all());
 
         try {
             return $this->run($request);

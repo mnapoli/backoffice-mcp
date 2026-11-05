@@ -64,6 +64,14 @@ Soft-deleted rows are excluded unless the agent asks for them with `trashed`.
 
 The model's own `$hidden`, `$visible` and `$appends` are ignored: the whitelist alone decides what a row contains.
 
+Tell the agent what the server is for with `$description`, for example which application this is and which repository holds its code:
+
+```php
+protected string $description = 'The Acme database, for its support team. The application is the acme/app repository.';
+```
+
+It comes before the generic instructions on using the tools, which also tell the agent to explore the application's code to understand the data. Override `$instructions` to replace those entirely.
+
 ### Computed columns
 
 `columns()` also accepts an accessor of the model, which is detected on its own. Use it to expose a value derived from columns the agent must not read:
@@ -85,14 +93,6 @@ The agent reads `masked_iban` and never `iban`, including when payments are load
 - A computed column is calculated in PHP, so it can be neither filtered nor sorted on. Declaring a filter or a sort on one is an error.
 - The accessor can read any column, so the whole row is loaded when a computed column is requested. Only what is whitelisted leaves the process.
 - A column of the table remains a regular column even if the model has an accessor of the same name.
-
-Tell the agent what the server is for with `$description`, for example which application this is and which repository holds its code:
-
-```php
-protected string $description = 'The Acme database, for its support team. The application is the acme/app repository.';
-```
-
-It comes before the generic instructions on using the tools, which also tell the agent to explore the application's code to understand the data. Override `$instructions` to replace those entirely.
 
 ## Exposing it
 

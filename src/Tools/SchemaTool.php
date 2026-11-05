@@ -14,9 +14,10 @@ use BackofficeMcp\Filter;
 #[Name('schema')]
 #[Description(<<<'TEXT'
     Lists everything the "query" and "count" tools can read: the resources that exist, and for
-    each one its columns with their database types, the columns that can be filtered on and how,
-    the columns that can be sorted on, and the relations that can be included. Call this first,
-    since anything absent from it is rejected.
+    each one its columns with their database types ("computed" for a value calculated by the
+    application, which is read like any column but never filtered or sorted on), the columns that
+    can be filtered on and how, the columns that can be sorted on, and the relations that can be
+    included. Call this first, since anything absent from it is rejected.
     TEXT)]
 #[IsReadOnly]
 #[IsIdempotent]
@@ -34,7 +35,7 @@ class SchemaTool extends BackofficeTool
 
             $columns = [];
             foreach ($resource->getColumns() as $column) {
-                $columns[$column] = $types->get($column, 'unknown');
+                $columns[$column] = in_array($column, $resource->getComputedColumns(), true) ? 'computed' : $types->get($column, 'unknown');
             }
 
             $resources[$name] = [

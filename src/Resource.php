@@ -23,6 +23,9 @@ final class Resource
     /** @var list<string> */
     private array $columns = [];
 
+    /** @var list<string>|null */
+    private ?array $computedColumns = null;
+
     /** @var array<string, Filter> */
     private array $filters = [];
 
@@ -55,10 +58,13 @@ final class Resource
 
     /**
      * The columns that may be selected and returned. They are also the default SELECT list.
+     *
+     * An accessor of the model can be listed too, see `getComputedColumns()`.
      */
     public function columns(string ...$columns): self
     {
         $this->columns = array_values(array_unique([...$this->columns, ...$columns]));
+        $this->computedColumns = null;
 
         return $this;
     }
@@ -100,6 +106,30 @@ final class Resource
     public function getColumns(): array
     {
         return $this->columns;
+    }
+
+    /**
+     * The listed columns that are accessors of the model and not columns of its table. A column
+     * of the table keeps being one even with an accessor of the same name, so that it can still
+     * be selected, filtered and sorted on.
+     *
+     * The table is only looked at for a name that has an accessor, which most columns do not.
+     *
+     * @return list<string>
+     */
+    public function getComputedColumns(): array
+    {
+        if ($this->computedColumns !== null) {
+            return $this->computedColumns;
+        }
+
+        $model = $this->newModel();
+        $schema = $model->getConnection()->getSchemaBuilder();
+
+        return $this->computedColumns = array_values(array_filter(
+            $this->columns,
+            fn(string $column) => $model->hasAnyGetMutator($column) && ! $schema->hasColumn($model->getTable(), $column),
+        ));
     }
 
     /**

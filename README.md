@@ -64,6 +64,28 @@ Soft-deleted rows are excluded unless the agent asks for them with `trashed`.
 
 The model's own `$hidden`, `$visible` and `$appends` are ignored: the whitelist alone decides what a row contains.
 
+### Computed columns
+
+`columns()` also accepts an accessor of the model, which is detected on its own. Use it to expose a value derived from columns the agent must not read:
+
+```php
+class Payment extends Model
+{
+    protected function maskedIban(): Attribute
+    {
+        return Attribute::get(fn() => '****' . substr($this->iban, -4));
+    }
+}
+
+Resource::for(Payment::class)->columns('id', 'amount', 'masked_iban');
+```
+
+The agent reads `masked_iban` and never `iban`, including when payments are loaded as a relation of another resource. Keep in mind that:
+
+- A computed column is calculated in PHP, so it can be neither filtered nor sorted on. Declaring a filter or a sort on one is an error.
+- The accessor can read any column, so the whole row is loaded when a computed column is requested. Only what is whitelisted leaves the process.
+- A column of the table remains a regular column even if the model has an accessor of the same name.
+
 Tell the agent what the server is for with `$description`, for example which application this is and which repository holds its code:
 
 ```php

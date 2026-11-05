@@ -98,8 +98,9 @@ class QueryTool extends BackofficeTool
         );
 
         $hasMore = $rows->count() > $limit;
+        $fields = $catalog->fields($resource, $validated['fields'] ?? [], $includes, $validated['counts'] ?? []);
         /** @var list<array<string, mixed>> $presented */
-        $presented = array_values($rows->take($limit)->map(fn(Model $row) => $catalog->present($resource, $row))->all());
+        $presented = array_values($rows->take($limit)->map(fn(Model $row) => $catalog->present($resource, $row, $fields))->all());
 
         // The query has already run by the time the response can be weighed, so a page too heavy
         // to send is trimmed rather than refused: refusing costs a second query for one answer.

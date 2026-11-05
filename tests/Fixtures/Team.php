@@ -2,6 +2,7 @@
 
 namespace BackofficeMcp\Tests\Fixtures;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -16,6 +17,12 @@ class Team extends Model
     use SoftDeletes;
 
     protected $guarded = [];
+
+    /** @return Attribute<string, never> */
+    protected function maskedSecret(): Attribute
+    {
+        return Attribute::get(fn(): string => '***' . substr((string) $this->secret, -2));
+    }
 
     /** @return BelongsTo<User, $this> */
     public function owner(): BelongsTo

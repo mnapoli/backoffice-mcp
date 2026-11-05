@@ -112,25 +112,39 @@ final readonly class Catalog
         }
 
         $key = $resource->keyName();
+        $computed = $resource->getComputedColumns();
 
-        $fields = $fields === [] ? $resource->getColumns() : $fields;
-        $fields = array_values(array_unique([...$fields, ...$this->keysRequiredBy($resource, $includes, $counts)]));
+        foreach ([...array_keys($resource->getFilters()), ...$resource->getSorts()] as $column) {
+            if (in_array($column, $computed, true)) {
+                throw new LogicException(sprintf('The column "%s" of resource "%s" is computed: it is not in the database, so it cannot be filtered or sorted on.', $column, $resource->name));
+            }
+        }
+
+        $fields = $this->fields($resource, $fields, $includes, $counts);
 
         $request = Request::create('/', 'GET', [
             'filter' => $filters,
             'sort' => implode(',', $this->tieBrokenSorts($sorts, $key)),
-            'fields' => ['_' => implode(',', $fields)],
+            'fields' => ['_' => implode(',', array_diff($fields, $computed))],
         ]);
 
         $query = QueryBuilder::for($resource->model, $request)
-            ->allowedFields(...$resource->getColumns())
+            ->allowedFields(...array_values(array_diff($resource->getColumns(), $computed)))
             ->allowedFilters(...$this->allowedFilters($resource))
             ->allowedSorts(...array_unique([...$resource->getSorts(), $key]));
+
+        // There is no telling which columns an accessor reads, so it gets the whole row, and
+        // `present()` is what keeps the columns that are not whitelisted from leaving the process.
+        if (array_intersect($fields, $computed) !== []) {
+            $query->select($query->qualifyColumn('*'));
+        }
 
         foreach ($includes as $relation) {
             $related = $this->related($resource, $relation);
             $query->with([$relation => function (Relation $builder) use ($related) {
-                $builder->select(array_map($builder->qualifyColumn(...), $related->getColumns()));
+                $builder->select($related->getComputedColumns() === []
+                    ? array_map($builder->qualifyColumn(...), $related->getColumns())
+                    : [$builder->qualifyColumn('*')]);
 
                 if (! $this->isToMany($builder)) {
                     return;
@@ -173,21 +187,46 @@ final readonly class Catalog
     }
 
     /**
+     * The columns a row contains for a set of tool arguments: the ones asked for, defaulting to
+     * every whitelisted column, and the keys that the relations need.
+     *
+     * @param  array<array-key, string>  $fields
+     * @param  array<array-key, string>  $includes
+     * @param  array<array-key, string>  $counts
+     * @return list<string>
+     */
+    public function fields(Resource $resource, array $fields = [], array $includes = [], array $counts = []): array
+    {
+        $fields = $fields === [] ? $resource->getColumns() : $fields;
+
+        return array_values(array_unique([...$fields, ...$this->keysRequiredBy($resource, array_values($includes), array_values($counts))]));
+    }
+
+    /**
      * Turn a row into the array the MCP client receives. The whitelist is applied here a second
      * time, so that a column that is not listed cannot leave the process even if something else
      * managed to load it.
      *
+     * @param  list<string>  $fields  the columns from `fields()`, defaulting to every whitelisted column
      * @return array<string, mixed>
      */
-    public function present(Resource $resource, Model $model): array
+    public function present(Resource $resource, Model $model, array $fields = []): array
     {
-        // The whitelist is the only thing deciding what a row contains, so the model's own
-        // serialisation rules are cleared first: `$appends` would run accessors over columns that
-        // were never selected, and `$hidden` or `$visible` are tuned for another audience and
-        // would drop columns this whitelist does want.
-        $attributes = $model->setAppends([])->setVisible([])->setHidden([])->attributesToArray();
+        $columns = array_values(array_intersect($fields === [] ? $resource->getColumns() : $fields, $resource->getColumns()));
 
-        $row = array_intersect_key($attributes, array_flip($resource->getColumns()));
+        // The whitelist is the only thing deciding what a row contains, so the model's own
+        // serialisation rules are replaced first: `$appends` would run accessors over columns that
+        // were never selected, and `$hidden` or `$visible` are tuned for another audience and
+        // would drop columns this whitelist does want. Computed columns can load the whole row,
+        // and making only the listed columns visible also leaves the casts and accessors of the
+        // others unused: they may be encrypted, for one.
+        $attributes = $model
+            ->setAppends(array_values(array_intersect($columns, $resource->getComputedColumns())))
+            ->setVisible($columns)
+            ->setHidden([])
+            ->attributesToArray();
+
+        $row = array_intersect_key($attributes, array_flip($columns));
 
         foreach ($resource->getIncludes() as $relation => $resourceName) {
             $countKey = Str::snake($relation) . '_count';

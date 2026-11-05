@@ -72,6 +72,28 @@ protected string $description = 'The Acme database, for its support team. The ap
 
 It comes before the generic instructions on using the tools, which also tell the agent to explore the application's code to understand the data. Override `$instructions` to replace those entirely.
 
+### Computed columns
+
+`columns()` also accepts an accessor of the model, which is detected on its own. Use it to expose a value derived from columns the agent must not read:
+
+```php
+class Payment extends Model
+{
+    protected function maskedIban(): Attribute
+    {
+        return Attribute::get(fn() => '****' . substr($this->iban, -4));
+    }
+}
+
+Resource::for(Payment::class)->columns('id', 'amount', 'masked_iban');
+```
+
+The agent reads `masked_iban` and never `iban`, including when payments are loaded as a relation of another resource. Keep in mind that:
+
+- A computed column is calculated in PHP, so it can be neither filtered nor sorted on. Declaring a filter or a sort on one is an error.
+- The accessor can read any column, so the whole row is loaded when a computed column is requested. Only what is whitelisted leaves the process.
+- A column of the table remains a regular column even if the model has an accessor of the same name.
+
 ## Exposing it
 
 Publish the configuration file:

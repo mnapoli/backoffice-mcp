@@ -128,7 +128,9 @@ final readonly class Catalog
             'fields' => ['_' => implode(',', array_diff($fields, $computed))],
         ]);
 
-        $query = QueryBuilder::for($resource->model, $request)
+        // The model's own `$with` is left out: it is not whitelisted, so `present()` drops it, and
+        // the keys it matches on are not selected unless `fields` happens to ask for them.
+        $query = QueryBuilder::for($resource->newModel()->newQuery()->withoutEagerLoads(), $request)
             ->allowedFields(...array_values(array_diff($resource->getColumns(), $computed)))
             ->allowedFilters(...$this->allowedFilters($resource))
             ->allowedSorts(...array_unique([...$resource->getSorts(), $key]));
@@ -142,6 +144,9 @@ final readonly class Catalog
         foreach ($includes as $relation) {
             $related = $this->related($resource, $relation);
             $query->with([$relation => function (Relation $builder) use ($related) {
+                // The related model's `$with` too, which would be a statement of its own per include
+                $builder->withoutEagerLoads();
+
                 $builder->select($related->getComputedColumns() === []
                     ? array_map($builder->qualifyColumn(...), $related->getColumns())
                     : [$builder->qualifyColumn('*')]);

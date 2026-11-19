@@ -9,6 +9,9 @@ class Deployment extends Model
 {
     protected $guarded = [];
 
+    // Loaded with every deployment by the application, whatever the MCP client asked for
+    protected $with = ['project'];
+
     /** @return BelongsTo<Project, $this> */
     public function project(): BelongsTo
     {

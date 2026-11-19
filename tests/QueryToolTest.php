@@ -2,6 +2,7 @@
 
 namespace BackofficeMcp\Tests;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -133,6 +134,46 @@ class QueryToolTest extends TestCase
                 ->where('rows.0.projects.0.name', 'Website')
                 ->where('rows.0.projects_count', 1)
                 ->etc());
+    }
+
+    public function test_the_default_eager_loads_of_a_model_are_not_run(): void
+    {
+        $team = Team::create(['name' => 'Acme']);
+        $project = Project::create(['team_id' => $team->id, 'name' => 'Website']);
+        Deployment::create(['project_id' => $project->id, 'status' => 'failed']);
+
+        // `$with` of the model would read `project_id`, which `fields` leaves out of the SELECT.
+        // Applications that turn this on would get an exception, or a report from the handler.
+        Model::preventAccessingMissingAttributes();
+
+        try {
+            AdminServer::tool(QueryTool::class, ['resource' => 'deployments', 'fields' => ['status']])
+                ->assertOk()
+                ->assertStructuredContent(fn(AssertableJson $json) => $json
+                    ->where('rows.0', ['status' => 'failed'])
+                    ->etc());
+        } finally {
+            Model::preventAccessingMissingAttributes(false);
+        }
+    }
+
+    public function test_the_default_eager_loads_of_included_rows_are_not_run(): void
+    {
+        $team = Team::create(['name' => 'Acme']);
+        $project = Project::create(['team_id' => $team->id, 'name' => 'Website']);
+        Deployment::create(['project_id' => $project->id]);
+
+        // One statement for the projects and one for their deployments, which is what the query
+        // timeout budget is divided by. The `project` of each deployment would be a third one.
+        DB::enableQueryLog();
+
+        AdminServer::tool(QueryTool::class, ['resource' => 'projects', 'include' => ['deployments']])
+            ->assertOk()
+            ->assertStructuredContent(fn(AssertableJson $json) => $json
+                ->has('rows.0.deployments.0', fn(AssertableJson $row) => $row->missing('project')->etc())
+                ->etc());
+
+        $this->assertCount(2, collect(DB::getQueryLog())->filter(fn(array $query) => str_starts_with(Str::lower($query['query']), 'select')));
     }
 
     public function test_it_caps_the_rows_of_an_included_relation_per_parent(): void
